@@ -27,24 +27,14 @@ void setup() {
   ws2812fx.setMode(FX_MODE_STATIC);
   ws2812fx.start();
   #ifdef MASTER
-    Serial.println("Try to connect");
     WiFi.begin(aSSID, aPASSWORD);
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
       blinkLED(12, 100);
-      Serial.print(".");
     }
-    Serial.println("Connected");
 
     server.begin();
   #endif
-}
-
-void blinkLED(int pin, int d) {
-  digitalWrite(pin, LOW);
-  digitalWrite(pin, HIGH);
-  delay(d);
-  digitalWrite(pin, LOW);
 }
 
 void loop() {
@@ -112,7 +102,7 @@ void slow() {
     }
   #endif
   #ifdef DEBUG
-    Serial.println(response);
+    logDebug(String(response));
   #endif
 }
 
@@ -149,7 +139,6 @@ void speed() {
 
     client.flush();
     client.print(response);
-    Serial.println(F("RSPONSE!"));
     delay(1);
   #endif
 }
