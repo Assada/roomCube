@@ -11,19 +11,16 @@ bool debug            = false;
 
 int illumination      = 0;
 int moveSensor        = 0;
-float humi            = 0.0;
-float tempDHT         = 0.0;
 
 String response       = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"error\": false,\"code\": 0}\n";
 
 #define LDR_PIN       A0
-#define DHT_PIN       7
-#define CIRCLE_PIN    8
+#define DHT_PIN       4
+#define CIRCLE_PIN    14
+#define MOVE_SENSOR   5
 
-#define MOVE_SENSOR   2
 #define LIGHT_LIMIT   200
-#define LIGHT_TIMER   200000
-#define TIMER_MS      2000
+#define LIGHT_TIMER   4000
 
 #define DELAY_TIME    1
 #define RESPONSE_TIME 2000
@@ -43,7 +40,7 @@ unsigned long start = 0;
 Adafruit_BMP280 bme;
 const int capacity    = JSON_OBJECT_SIZE(7);
 #else
-const int capacity    = JSON_OBJECT_SIZE(5);
+const int capacity    = JSON_OBJECT_SIZE(4);
 #endif
 WS2812FX ws2812fx = WS2812FX(8, CIRCLE_PIN, NEO_RGB + NEO_KHZ800);
 DHT dht(DHT_PIN, DHT11);

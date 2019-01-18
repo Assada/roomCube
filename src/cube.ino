@@ -8,6 +8,9 @@ void setup() {
     debug = true;
   #endif
 
+  pinMode(MOVE_SENSOR, INPUT);
+  digitalWrite (MOVE_SENSOR, LOW);
+
   Serial.begin(MSPEED);
   #ifdef BMP280
     if (!bme.begin(0x76)) {
@@ -18,20 +21,30 @@ void setup() {
     }
   #endif
   ws2812fx.init();
-  ws2812fx.setBrightness(255);
-  ws2812fx.setSpeed(1000);
+  ws2812fx.setBrightness(0);
+  ws2812fx.setSpeed(200);
   ws2812fx.setColor(0x007BFF);
   ws2812fx.setMode(FX_MODE_STATIC);
   ws2812fx.start();
   #ifdef MASTER
+    Serial.println("Try to connect");
     WiFi.begin(aSSID, aPASSWORD);
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
-      blinkLED(13, 100);
+      blinkLED(12, 100);
+      Serial.print(".");
     }
+    Serial.println("Connected");
 
     server.begin();
   #endif
+}
+
+void blinkLED(int pin, int d) {
+  digitalWrite(pin, LOW);
+  digitalWrite(pin, HIGH);
+  delay(d);
+  digitalWrite(pin, LOW);
 }
 
 void loop() {
@@ -56,9 +69,6 @@ void slow() {
     }
   #endif
 
-  humi = dht.readHumidity();
-  tempDHT = dht.readTemperature();
-
   if (error) {
     #ifdef BMP280
       error = false;
@@ -76,11 +86,6 @@ void slow() {
     }
   #endif
   if (!error) {
-    float midTemp = 0.0;
-    #ifdef BMP280
-      midTemp = (tempDHT+temp)/2;
-    #endif
-
     json = "";
     StaticJsonBuffer <capacity> jb;
     JsonObject &obj = jb.createObject();
@@ -88,11 +93,11 @@ void slow() {
     #ifdef BMP280
     obj["temp"] = temp;
     obj["pressure"] = pressure;
+    obj["mt"] = (tempDHT+temp)/2;
     #endif
 
-    obj["td"] = tempDHT;
-    obj["mt"] = midTemp;
-    obj["h"] = humi;
+    obj["td"] = dht.readTemperature();
+    obj["h"] = dht.readHumidity();
     obj["m"] = moveSensor;
     obj["i"] = illumination;
     obj.printTo(json);
@@ -115,17 +120,12 @@ void processLight() {
   now = millis();
 
   ws2812fx.service();
-
-  if(now - last_change > TIMER_MS) {
-    ws2812fx.setMode((ws2812fx.getMode() + 1) % ws2812fx.getModeCount());
-    last_change = now;
-  }
 }
 
 void speed() {
   processLight();
   
-  illumination = 1024 - analogRead(LDR_PIN);
+  illumination = analogRead(LDR_PIN);
   moveSensor = digitalRead(MOVE_SENSOR);
 
   if (moveSensor == 1 && illumination <= LIGHT_LIMIT) {
@@ -133,7 +133,7 @@ void speed() {
     start = millis();
   }
 
-  if (lightStatus && (millis() - start > LIGHT_TIMER || illumination > LIGHT_LIMIT)) {
+  if (moveSensor == 0 && lightStatus && (millis() - start > LIGHT_TIMER || illumination > LIGHT_LIMIT)) {
     start = LIGHT_TIMER + 1;
     lightOff();
   }
@@ -149,12 +149,14 @@ void speed() {
 
     client.flush();
     client.print(response);
+    Serial.println(F("RSPONSE!"));
     delay(1);
   #endif
 }
 
 void lightOn(int r, int g, int b, int m) {
   if(!lightStatus) {
+    ws2812fx.setSegment(0,  0,  8, FX_MODE_STATIC, 0x007BFF, 200, FADE_SLOW);
     ws2812fx.setBrightness(255);
     lightStatus = true;
     #ifdef DEBUG
