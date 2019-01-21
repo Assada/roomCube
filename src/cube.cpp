@@ -117,9 +117,6 @@ void slow() {
       blinkLED(GREEN_LED, 600);
     }
   #endif
-  #ifdef DEBUG
-    logDebug(String(response));
-  #endif
 }
 
 void processLight() {

@@ -1,9 +1,9 @@
-#include <Arduino.h>
+#include <ArduinoJson.h>
 #include <Adafruit_Sensor.h>
 #ifdef BMP280
     #include <Adafruit_BMP280.h>
 #endif
-#include <ArduinoJson.h>
+
 #include <DHT.h>
 #include <WS2812FX.h>
 
@@ -11,8 +11,6 @@ bool debug            = false;
 
 int illumination      = 0;
 int moveSensor        = 0;
-
-String response       = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"error\": false,\"code\": 0}\n";
 
 #define LDR_PIN       A0
 #define DHT_PIN       4
