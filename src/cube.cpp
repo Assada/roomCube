@@ -1,6 +1,7 @@
-#include <cube.h>
 #ifdef MASTER
-#include <cube_esp.h>
+#include <cube_esp.cpp>
+#else
+#include <cube.h>
 #endif
 
 void setup() {
@@ -8,6 +9,11 @@ void setup() {
     debug = true;
   #endif
 
+  #ifdef MASTER
+    pinMode(RED_LED, OUTPUT);
+    pinMode(GREEN_LED, OUTPUT);
+    pinMode(BLUE_LED, OUTPUT);
+  #endif
   pinMode(MOVE_SENSOR, INPUT);
   digitalWrite (MOVE_SENSOR, LOW);
 
@@ -15,7 +21,8 @@ void setup() {
   #ifdef BMP280
     if (!bme.begin(0x76)) {
       if (!bme.begin(0x76)) {
-        response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\n\r\n{\"error\": true,\"code\": \"0001\"}\n";
+        errorObj["error"] = true;
+        errorObj["code"] = "0x1"
         error = true;
       }
     }
@@ -30,10 +37,11 @@ void setup() {
     WiFi.begin(aSSID, aPASSWORD);
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
-      blinkLED(12, 100);
+      blinkLED(BLUE_LED, 100);
     }
 
-    server.begin();
+    initTime();
+    initServer();
   #endif
 }
 
@@ -45,11 +53,25 @@ void loop() {
     slow();
     tick = 0;
   }
+  #ifdef MASTER
+    if (last_conn_status != WiFi.status()) {
+      if (WiFi.status() != WL_CONNECTED) {
+        digitalWrite(BLUE_LED, 200);
+          #ifdef DEBUG
+            logDebug("WiFi connected");
+          #endif
+      } else {
+        blinkLED(BLUE_LED, 200);
+          #ifdef DEBUG
+            logDebug("WiFi connected");
+          #endif
+      }
+      last_conn_status = WiFi.status();
+    }
+  #endif
 }
 
 void slow() {
-  String json = "{}";
-  char buffer[255];
   #ifdef BMP280
     float temp = bme.readTemperature();
     float pressure = bme.readPressure() / 133.322;
@@ -63,7 +85,8 @@ void slow() {
     #ifdef BMP280
       error = false;
       if (!bme.begin(0x76)) {
-        response = "HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\n\r\n{\"error\": true,\"code\": \"0002\"}\n";
+        errorObj["error"] = true;
+        errorObj["code"] = "0x2"
         error = true;
         errors = 1 + errors;
       }
@@ -76,10 +99,6 @@ void slow() {
     }
   #endif
   if (!error) {
-    json = "";
-    StaticJsonBuffer <capacity> jb;
-    JsonObject &obj = jb.createObject();
-
     #ifdef BMP280
     obj["temp"] = temp;
     obj["pressure"] = pressure;
@@ -90,15 +109,12 @@ void slow() {
     obj["h"] = dht.readHumidity();
     obj["m"] = moveSensor;
     obj["i"] = illumination;
-    obj.printTo(json);
-    sprintf(buffer, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n%s\n", json.c_str());
-    response = buffer;
   }
 
   #ifdef MASTER
     if (error) {
-      blinkLED(13, 100);
-      blinkLED(12, 600);
+      blinkLED(BLUE_LED, 100);
+      blinkLED(GREEN_LED, 600);
     }
   #endif
   #ifdef DEBUG
@@ -107,8 +123,6 @@ void slow() {
 }
 
 void processLight() {
-  now = millis();
-
   ws2812fx.service();
 }
 
@@ -118,29 +132,16 @@ void speed() {
   illumination = analogRead(LDR_PIN);
   moveSensor = digitalRead(MOVE_SENSOR);
 
-  if (moveSensor == 1 && illumination <= LIGHT_LIMIT) {
+  if ((millis() - lastMotion > 2000) && moveSensor == 1 && illumination <= LIGHT_LIMIT) {
     lightOn(255, 0, 255, 0);
     start = millis();
   }
 
-  if (moveSensor == 0 && lightStatus && (millis() - start > LIGHT_TIMER || illumination > LIGHT_LIMIT)) {
+  if (lightStatus && (millis() - start > LIGHT_TIMER || illumination > LIGHT_LIMIT)) {
     start = LIGHT_TIMER + 1;
     lightOff();
+    lastMotion = millis();
   }
-
-  #ifdef MASTER
-    WiFiClient client = server.available();
-    if (!client) {
-      return;
-    }
-    while (!client.available()) {
-      delay(1);
-    }
-
-    client.flush();
-    client.print(response);
-    delay(1);
-  #endif
 }
 
 void lightOn(int r, int g, int b, int m) {
